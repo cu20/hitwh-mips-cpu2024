@@ -1,0 +1,184 @@
+# 主程序入口
+main:
+    # 初始化输入数
+    add $t0, $a0, $zero  # $t0 = $a0 (输入数)
+    addi $at,$zero,1     # at 用以恒等于1
+    beq $t0, $zero, not_palindrome
+    beq $t0, $at, not_palindrome
+    # 检查是否是质数
+    jal check_prime
+    beq $t2, $zero, not_palindrome # 如果不是质数，直接返回 0
+
+    # 检查是否是回文数（2, 8, 10, 16 进制分别检测）
+    addi $t2, $zero, 2        # 设置进制 2
+    jal check_palindrome
+     addi $k0, $zero , 0
+    add $s0, $v0, $zero  # 保存 2 进制的结果到 $s0
+    add $v0 , $zero, $zero
+
+    addi $t2, $zero, 8        # 设置进制 8
+    jal check_palindrome
+     addi $k0, $zero , 0
+    add $s1, $v0, $zero  # 保存 8 进制的结果到 $s1
+    add $v0 , $zero, $zero
+
+    addi $t2, $zero, 10       # 设置进制 10
+    jal check_palindrome
+     addi $k0, $zero , 0
+    add $s2, $v0, $zero  # 保存 10 进制的结果到 $s2
+    add $v0 , $zero, $zero
+
+    addi $t2, $zero, 16       # 设置进制 16
+    jal check_palindrome
+     addi $k0, $zero , 0
+    add $s3, $v0, $zero  # 保存 16 进制的结果到 $s3
+    add $v0 , $zero, $zero
+    
+    sw $s0, 128($zero)
+    sw $s1, 129($zero)
+    sw $s2, 130($zero)
+    sw $s3, 131($zero)
+    j exit
+
+not_palindrome:
+    # 不满足条件，返回 0
+    add $s0, $v0, $zero
+    add $s1, $v0, $zero
+    add $s2, $v0, $zero
+    add $s3, $v0, $zero
+    j exit
+
+# 子程序：质数检测
+# 输入：$t0 (要检查的数字 n)
+# 输出：存储到 is_prime (1: 是质数, 0: 不是质数)
+check_prime:
+    addi $k0, $zero , 0
+    addi $t1, $zero, 2        # 初始化除数为 2
+    addi $t2, $zero, 0        # 假定为质数
+    # 替代 `blez` 的实现（检查 n 是否 <= 0）
+    slt $t3, $t0, $zero       # $t3 = (n < 0) ? 1 : 0
+    beq $t3, $at, not_prime # 如果 n <= 0, 直接返回 0
+
+check_loop:
+    addi $k0, $zero , 0
+    # 手动实现 n / i 和 n % i
+    add $t3, $zero, $zero     # $t3 = 商，先初始化为 0
+    add $t4, $t0, $zero       # $t4 = 被除数，初始化为被除数
+div_loop:
+    addi $k0, $zero , 0
+    sub $t4,$t4,$t1
+    beq $t4, $zero, div_end   # 如果被除数等于 0，结束
+    bltz $t4, div_end         # 如果结果 < 0，结束
+    addi $t3, $t3, 1          # 商 ++
+    j div_loop
+div_end:
+    beq $t4,$zero,not_prime #为0直接跳转
+    add $t4, $t4, $t1       # $t4 = 余数 ,修正负数
+    addi $t1, $t1, 1          # i++
+    # 替代 i^2 的计算
+    add $t5, $t1, $zero       # $t5 = 除数
+    add $t6, $zero, $zero
+square_loop:
+    addi $k0, $zero , 0
+    add $t6, $t6, $t1         # $t6 = 除数 * 除数
+    addi $t7, $zero, -1       # $t7 = -1
+    add $t5, $t5, $t7         # $t5 -= 1
+    bltz $t5, square_loop_break     # t5 < 0 则退出循环
+    beq $t5, $zero,square_loop_break  #t5=0，结束循环
+    j square_loop             #继续循环
+    square_loop_break:
+    slt $t7, $t0, $t6         # 检查 n 是否小于除数的平方
+    beq $t7, $at, end_prime
+    j check_loop
+
+not_prime:
+    addi $t2, $zero, 0        # 设置为非质数
+    jr $ra
+
+end_prime:
+    addi $t2, $zero, 1        # 设置为质数
+    jr $ra
+
+# 判断回文数程序
+# 输入：
+#   $t0 - 要判断的数 n
+#   $t2 - 使用的进制 base
+# 输出：
+#   $v0 - 1 (是回文数), 0 (不是回文数)
+
+check_palindrome:
+    # 初始化变量
+    add $t3, $t0, $zero       # $t3 保存原始数 n
+    add $t4, $zero, $zero     # $t4 用于存储反转后的数字 reverse = 0
+    add $t5, $zero, $zero     # $t5 临时变量
+    add $t6, $zero, $zero     # $t6 临时变量
+    add $t7, $zero, $zero     # $t7 临时变量
+    add $t8, $zero, $zero     # $t7 临时变量
+    add $t9, $zero, $zero     # $t9 临时变量
+#进入 reverse
+reverse_loop:
+    addi $k0, $zero , 0
+    # 检查是否已处理完所有位
+    beq $t3, $zero, compare_result
+    # 手动取余操作，计算当前位
+    add $t6, $zero, $t2       # $t6 = base
+find_remainder:
+    addi $k0, $zero , 0
+    slt $t7, $t6, $t3         # $t7 = ($t6 < $t3) ? 1 : 0
+    beq $t6, $t3, finish_remainder1
+    beq $t7, $zero, finish_remainder # 如果 base >= $t3，跳出循环
+    add $t6, $t6, $t2         # $t6 += base
+    j find_remainder
+
+finish_remainder:
+    addi $k0, $zero , 0
+    sub $t6, $t6, $t2         # 等价于sub $t6, $t6, $t2 
+finish_remainder1:
+    sub $t5, $t3, $t6         # t5 是 余数
+    #add $t5, $t3, $t9        # 等价于 sub $t5, $t3, $t6，得到余数
+
+    # 手动更新原数，模拟 n // base
+    add $t9, $zero, $zero     # $t9 = 商，初始化为 0
+
+reduce_number:
+    addi $k0, $zero , 0
+    slt $t7, $t3, $t2         # 检查 $t3 < $t6，结果存入 $t7
+    beq $t7, $at, finish_reduce # 如果 $t3 < $t6，跳出循环
+    sub $t3, $t3, $t2         # $t3 = $t3 - $t6（手动减法）
+    addi $t9, $t9, 1          # $t9++，记录商值
+    j reduce_number           # 继续循环
+finish_reduce:
+    add $t3, $zero, $t9         #将t3更新为商
+    # 更新反转数字
+    add $t8, $zero, $zero       # $t8 = reverse   
+    add $t7, $zero, $t2       # $t7 = base，初始化计数器
+
+multiply_reverse:
+     addi $k0, $zero , 0
+    beq $t7, $zero, finish_multiply # 如果 base 次数耗尽，跳出循环
+    addi $t7, $t7, -1         # 计数器减 1
+    add $t8, $t8, $t4         # 累加 reverse 到 $t6
+    j multiply_reverse
+finish_multiply:
+    add $t4, $zero, $t8       # 将结果保存到 $t4
+add_digit:
+    add $t4, $t4, $t5         # reverse += digit
+    j reverse_loop            # 继续处理下一位
+
+compare_result:
+    # 比较反转数字和原始数字
+    beq $t4, $t0, is_palindrome # 如果 reverse == n，跳转
+    add $v0, $zero, $zero      # 否则 $v0 = 0 (不是回文数)
+    j end_check_palindrome
+
+is_palindrome:
+    addi $k0, $zero , 0
+    addi $v0, $zero, 1          # $v0 = 1 (是回文数)
+    jr $ra 
+
+end_check_palindrome:
+    addi $k0, $zero , 0
+    jr $ra                     # 返回调用点
+
+exit:
+    addi $k0, $zero , 0
